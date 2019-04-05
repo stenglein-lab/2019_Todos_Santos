@@ -1,7 +1,5 @@
 # Mapping and Assembly Exercise
 ---
-![TS 2018](./TS_WorkshopLogo.png)
----
 
 ## In this exercise, we will download, process, and evaluate NGS datasets and genome sequences.  We will:
 
@@ -10,7 +8,7 @@
 * Trim low quality bases and adapter sequences from reads
 * Find and download genome sequences and associated annotation from NCBI
 * Map reads from a dataset to a reference genome
-* Perform de novo assembly 
+* Perform de novo assembly (on Wednesday)
 
 ---
 
@@ -235,10 +233,6 @@ Hint: In less: press `space` to advance a page and `q` to exit
 
 
 
-![stop](./stop.png)
-**We will stop here for today and continue tomorrow**
-
-
 
 ## Read Mapping
 
@@ -369,9 +363,12 @@ Some questions to consider when viewing the alignment:
  - Can you identify mapped read pairs?  
 
 
+![stop](./stop.png)
+**We will stop here for today and continue on Wednesday with genome assemblies**
+
 ## De novo assembly
 
-Now we've practiced mapping to a reference sequence.  Imagine instead that we don't have a reference sequence.  In that case, we'd need to perform de novo assembly.  
+We have practiced mapping to a reference sequence.  Imagine that we don't have a reference sequence.  In that case, we'd need to perform de novo assembly.  
 
 ![assembly](./assembly.png)
 **Genome assembly is like doing a jigsaw puzzle when you don't know what the picture looks like.  Image credit: Keith Bradnam, UC Davis**

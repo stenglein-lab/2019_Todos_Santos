@@ -3,7 +3,7 @@
 This repository contains materials created by [Mark Stenglein](http://stengleinlab.org) for the [Todos Santos Genomics and Bioinformatics Workshop](https://dbsloan.github.io/TS2019/), Apr 8-12 2019
 
 <a href="https://dbsloan.github.io/TS2019/">
-<img border="0" alt="Todos Santos workshop" src="./lectures/TS_WorkshopLogo.png">
+<img border="0" alt="Todos Santos workshop" src="./lectures/TS_WorkshopLogo.png" width="50%" height="auto">
 </a>
 
 

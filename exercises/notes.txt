@@ -1,0 +1,4 @@
+
+fastq-dump is slow.  Might be very slow w/ multiple simultaneous downloads…
+
+cut adapt not completely removing adapters… :<

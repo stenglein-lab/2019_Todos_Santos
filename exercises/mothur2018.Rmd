@@ -1,0 +1,373 @@
+---
+title: "Using Mothur to analyze 16S data"
+output:
+  html_document:
+    toc: true
+---
+
+## Background
+A common way to characterize microbial communities is to identify which taxa are present using 16S sequences. Mothur is very popular open source programs to process raw sequence data, compare sequences against a database to determine taxonomic groups represented by each sequence, and create an OTU (Operational Taxonomic Unit) table counting up the taxa identified in your set of samples. Another popular alternative is Qiime. Both Qiime and mothur are rather fast compared to some of the programs we've run so far, so you can run them on your desktop. The idea is to first simplify your datasets by finding duplicate reads that represent the exact same sequence, then you can cluster the existing sequences into OTUs. The clustering algorithm that mothur uses only identifies the lineages represented in your database - you basically cluster things that are close enough matches to the same OTU in the reference database and discard any non-matches. The database we provide here is not the most comprehensive database available, so check for the latest options when you start to analyze your data. Another clustering approach is to avoid the database, and just cluster based on sequence similarities. Qiime has a different clustering algorithm that does't discard the non-matches, but creates new clusters among them based on sequencing similarity. You can mix and match programs and try different clustering algorithms on your samples to decide which approach you prefer. 
+
+After assigning OTUs to the unique sequences, you next count up the number of times each OTU appears in each sample to make the OTU table. You then want to visualize the data and analyze metrics of diversity using the numerous tools available in R. 
+
+## Objectives
+We will use mothur to identify OTUs present in a few soil samples and a few lab isolates. We then estimate diversity and visualize sample features in both mothur and R.
+
+## Software and Dependencies
+- mothur
+
+## Protocol
+
+### 1. Set up files
+Navigate to the directory named mothur. Inside there's a folder called 16Sdata. Use unix commands to investigate which files are in the directory. The raw data folder contains paired-end sequences that are 250 bp each. Paired-end sequencing is highly recommended for this application because of sequencing errors. We'll start assuming you've already removed low-quality bp from the end of the reads as well as the barcode & primer sequences.
+
+Now open the mothur program.
+
+```{bash, eval=FALSE}
+mothur
+```
+
+As you can see, you can exit the program by typing quit().
+
+Mothur has extensive documentation available for every command. This documentation is available at https://mothur.org/wiki/Mothur_manual -- each command has its own page with lots of details. 
+
+The following command will create an index of the filenames that represent the paired files from each sample.
+
+```{bash, eval=FALSE}
+make.file(inputdir=16Sdata, type=fastq, prefix=stability)
+```
+
+This creates a file called stability.files in the 16Sdata directory. Note, whatever name you choose here as your prefix should be informative as all your file names will inherit the same prefix by default. In this case, we've just selected a generic name, but you could change it to whatever name makes sense to you.
+
+Hint: if you quit mothur later on and type mothur to open the program again, it won't remember what directory you're looking at. Just run the above command again to re-set the input directory.
+
+### 2. Combine paired-end reads and clean up dataset to remove sequencing errors.
+Next, we will take advantage of the fact that you have paired-end sequences. The two reads should be perfect reverse complements. Sequencing errors will sometimes create mismatches, and this next command will identify the best supported sequence for each paired read. If the true sequence is ambiguous (e.g. mismatches have similar quality scores), then the base pair gets assigned to N.
+
+The option processors = 2 below sets the number of processors to use for the entire session in mothur. If you're working on a machine with plenty of processors and have a large dataset, you'll want to increase that number. Here, because we're all sharing the same server, 2 processors is safe.
+
+
+```{bash, eval=FALSE}
+make.contigs(file=stability.files, processors=2)
+summary.seqs(fasta=stability.trim.contigs.fasta)
+```
+
+Read the outputs within mothur describing the results of each of these commands. 
+- How long are the reads that got assembled? 
+- The length of the PCR product should be 252, so what does that maximum contig length suggest? 
+
+You will want to check these outputs carefully because they give you insight into the data cleanup steps you need. Your sequencing facility might automatically do some data cleanup, in which case you could choose to skip some of the steps below. Or, you might need additional data processing steps.
+
+Note, check the output file names you've just created. As you go through each data processing step, mothur appends that step into the file name. This means that if you run a different subset of these data processing steps, your file names will be slightly different. Subsequent steps would generate errors if you just pasted the command in without changing the file names. Also, if you re-run a command and change something, mothur will overwrite your first data file automatically -- if you want to keep both files, change the name of the first one.
+
+To clean up these contigs, we now filter out any sequences with any ambiguities & anything that's longer than 275 to proceed with the most reliable dataset. This is a step that you would adjust depending on your sequencing parameters and confirm based on the summary.seqs step.
+
+```{bash, eval=FALSE}
+screen.seqs(fasta=stability.trim.contigs.fasta, group=stability.contigs.groups, maxambig=0,maxlength=275)
+```
+
+An equivalent way to do the above filtering, which might be faster, takes advantage of the information from the summary file directly rather than running through all the sequences. The command is below (you can run it if you want, but the output should be the same as above).
+
+```{bash, eval=FALSE}
+screen.seqs(fasta=stability.trim.contigs.fasta, group=stability.contigs.groups, summary=stability.trim.contigs.summary, maxambig=0, maxlength=275)
+```
+
+What are the outputs? Mothur is very good at giving you all the output file names. Check them at each step, and compare what you just created to the name in the next input step. Do you understand the default naming scheme?
+
+
+### 3. Process sequences to reduce full dataset to unique sequences that represent the same part of the 16S gene.
+To minimize processing speed when you compare against the database, we will merge identical sequences from all samples. 
+
+```{bash, eval=FALSE}
+unique.seqs(fasta=stability.trim.contigs.good.fasta)
+system(head 16Sdata/stability.trim.contigs.good.unique.fasta)
+```
+
+That second line is an important trick -- within mothur, unix commands won't work unless you write them within the parentheses of system(). If you want to rename, view, or move files, instead of quitting mothur, use system anytime. It's a great way to check exactly what you are doing. Add in these checks anytime to peek into the files you created. For large files, it can be helpful to limit the lines you view (e.g. one line with the -n option below).
+
+```{bash, eval=FALSE}
+system(head -n 1 16Sdata/stability.trim.contigs.good.names)
+```
+
+Next, we summarize the counts of each unique sequence in each sample. We'll then look at three lines of output to see what the file we just created contains.
+
+```{bash, eval=FALSE}
+count.seqs(name=stability.trim.contigs.good.names, group=stability.contigs.good.groups)
+system(head -n 3 16Sdata/stability.trim.contigs.good.count_table)
+```
+
+We'll use that output file in subsequent steps. Now look at the summary of the results.
+
+```{bash, eval=FALSE}
+summary.seqs(count=stability.trim.contigs.good.count_table)
+```
+
+Repeat the previous summary.seqs step for easy comparison (you can use the up arrow to scroll through previous commands while in mothur). Does the filtered dataset make sense as far as number of sequences and length? Comparing these summaries are an important check.
+
+The dataset came from a PCR targeted at only one region of the genome, so we expect all of our good sequences to align to that particular region. We can identify sequences that are misaligned: 
+
+```{bash, eval=FALSE}
+align.seqs(fasta=stability.trim.contigs.good.unique.fasta, reference=silva.bacteria.fasta)
+summary.seqs(fasta=stability.trim.contigs.good.unique.align, count=stability.trim.contigs.good.count_table)
+```
+
+What does this output mean? We see that most of the sequences align to a consistent part of the reference sequence - these are the well-aligned sequences. Anything that aligns out of that consistent spot is an amplification error.
+
+Below is the command to filter out the badly aligned sequences. Make sure the numbers match your output from the previous command and adjust the numbers as needed.
+
+```{bash, eval=FALSE}
+screen.seqs(fasta=stability.trim.contigs.good.unique.align, count=stability.trim.contigs.good.count_table, summary=stability.trim.contigs.good.unique.summary, start=13870, end=23444, maxhomop=8)
+```
+
+We have a few more minor cleanup steps to do. We can use filter.seqs to remove the overhangs at each end and removes gaps. Basically, we want to compare % identity over the same section of 16S in all the sequence reads, so we discard the extra base pairs for sequences that happened to be a little longer. 
+
+That filter.seqs step will then create some sequences that are now identical, so we can re-run unique.seqs again to remove the new duplicates.
+
+```{bash, eval=FALSE}
+filter.seqs(fasta=stability.trim.contigs.good.unique.good.align, vertical=T, trump=.)
+unique.seqs(fasta=stability.trim.contigs.good.unique.good.filter.fasta, count=stability.trim.contigs.good.good.count_table)
+```
+
+Next we group sequences that are quite similar - only differing by 2 base pairs of the 250, in this case. Again, this reduces computational needs for subsequent steps since we're pretty confident sequences that are 99% identical will get assigned to the same OTU.
+
+```{bash, eval=FALSE}
+pre.cluster(fasta=stability.trim.contigs.good.unique.good.filter.unique.fasta, count=stability.trim.contigs.good.unique.good.filter.count_table, diffs=2)
+```
+
+Next, we'll identify chimeras based on partial matches among sequences. We'll remove those samples from the count file and the fasta file. If for some reason you needed all the sequence data in your sample, you can instead split your chimeric reads in two - but for most applications, you have plenty of reads and can ignore problematic chimeras.
+
+```{bash, eval=FALSE}
+chimera.vsearch(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.count_table, dereplicate=t)
+remove.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.fasta, accnos=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.accnos)
+```
+
+Note, there's a trick that you can use here and elsewhere. Mothur keeps track of what you've just done. The get.current() command will show you what it's keeping track of. This means that you don't need to write the full file name if you want to use one of the files listed in get.current().
+
+```{bash, eval=FALSE}
+get.current()
+summary.seqs(fasta=current, count=current)
+```
+
+As a final data processing step, we want to remove anything that's not bacterial 16S. Your PCR was targeting just bacterial 16S, so anything else is considered a contaminant. The first step checks the database to assign taxonomic groups to each sequence, and the second step removes everything non-bacterial.
+
+```{bash, eval=FALSE}
+classify.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.count_table, reference=trainset9_032012.pds.fasta, taxonomy=trainset9_032012.pds.tax, cutoff=80)
+remove.lineage(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.count_table, taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.taxonomy, taxon=Chloroplast-Mitochondria-unknown-Archaea-Eukaryota)
+summary.seqs(fasta=current, count=current)
+summary.tax(taxonomy=current, count=current)
+```
+
+Now we have a very reliable set of unique sequences. We've been very conservative in removing parts of reads which don't have good support. If you are very interested in rare reads, you will want to consider each of the above filtering steps to make sure you aren't losing reads of interest.
+
+
+### 4. Assessing quality by sequencing 'mock' community.
+To make sure your sequencing is working well, you should run 'mock' communities in which you know what sequences to expect - a positive control in which you know the relative abundance. We ran a zymo mock community as one sample, so we'll now check on that.
+
+First, let's select only the mock community samples.
+
+```{bash, eval=FALSE}
+get.groups(count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.count_table, fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.fasta, groups=Mock)
+summary.seqs(fasta=current, count=current)
+```
+
+As you can see, we have many fewer sequences now - 41 unique sequences. The mix we put in included DNA from 8 bacterial species and 2 yeast, so we expect to amplify only 8 sequences. Let's explore the sequences in the Mock community in more detail. We want to look at the number of OTUs we have. Recall, we expect 16S to amplify from 8 species. First we cluster sequences that are very similar, then look at the counts we have. We'll go over these steps in more detail later.
+
+```{bash, eval=FALSE}
+dist.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, cutoff=0.03)
+cluster(column=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.dist, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table)
+make.shared(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, label=0.03)
+system(more 16Sdata/stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+```
+
+This last table you see is the OTU table for the Mock community - counts of OTUs in each sample.
+
+How many of these sequences are abundant? What might the others be? Are you satisfied with the results from your mock community?
+
+A thorough analysis of Mock communities involves examining the sequences themselves to assess sequencing error rates, and comparing relative abundances of the different taxa.
+
+### 5. Assess background contamination.
+We'll now look at the sequences in the water sample - and also the isolate samples, each of which represents one pure bacterial culture. The water sample should have zero reads, and each isolate sample should have many reads of the same sequence. We'll process these together, selecting these groups and processing them as above. When we select the new groups, remember we overwrite the Mock Community data -- if you wanted those results, you should change the names.
+
+As above, we pull the unique sequences that appeared in any of the isolates or the water negative control sample. We cluster them into OTUs and examine the counts of each OTU in each sample.
+
+Most sequencing runs won't have these isolate samples - we'll analyze them here because they are illustrative. Your real data might include several water samples, in which case you should examine them all.
+
+```{bash, eval=FALSE}
+get.groups(count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.count_table, fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.fasta, groups=water-isolate1-isolate2-isolate3-isolate4-isolate5-Mock)
+summary.seqs(fasta=current, count=current)
+dist.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, cutoff=0.03)
+cluster(column=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.dist, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table)
+make.shared(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, label=0.03)
+system(more 16Sdata/stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+```
+
+The resulting table is a bit hard to read - feel free to download the file using Cyberduck & open it in a different program where the table columns are aligned.
+
+Either way, is this distribution what you expect? How many total counts were there in the water (negative) control? Where did that contamination come from?
+
+These negative and positive controls are very important for assessing each sequencing run. Once you are satisfied your data will be meaningful, it's time to proceed with the analyses of your samples.
+
+
+### 6. Create OTU table which counts the number of each OTU represented in each sample.
+Now we'll create the OTU table from the soil samples. We will now run the same set of commands we did above to create OTU tables for the Mock community & the isolates and water sample. If you wanted the previous set of files, you should move or rename them before proceeding, as mothur will overwrite them.
+
+This time we'll select just the soil samples for analysis. We'll use a different function, remove.groups, as you'll often be omitting a small number of control samples. 
+
+First you create a distance matrix for all the sequences using dist.seqs -- this generates a matrix of pairwise measures comparing the unique sequences. We're using the default setting, but once you've explored your real data, you would perhaps consider a different distance matrix option. Next you cluster those sequences based on that distance matrix output file into the OTUs. Mothur offers a variety of clustering methods. Look up the possible methods here: https://www.mothur.org/wiki/Cluster -- which algorithm does the cluster command below employ?
+
+```{bash, eval=FALSE}
+remove.groups(count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.count_table, fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.fasta, taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.pick.taxonomy, groups=Mock-water-isolate1-isolate2-isolate3-isolate4-isolate5)
+dist.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, cutoff=0.03)
+cluster(column=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.dist, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table)
+```
+
+As usual, check the output files. What did you create? View the contents of the files from the previous steps. The clusters represent the OTUs.
+
+Now we create the OTU table based on those clusters:
+
+```{bash, eval=FALSE}
+make.shared(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, label=0.03)
+```
+
+That is a basic OTU table - inspect some of it if you wish. These have arbitrary names, and now you want to assign some taxonomy to make sense of the OTUs in each sample for further analyses.
+
+```{bash, eval=FALSE}
+classify.otu(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.pick.pick.taxonomy, label=0.03)
+```
+
+Open the output files from the last step and confirm that you know what the last step did. You could download it using cyberduck or check the head and tail (employing options to limit the number of bytes output with -c or the number of lines with -n).
+
+```{bash, eval=FALSE}
+system(head -c 400 16Sdata/stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+system(tail -n 2 16Sdata/stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+```
+
+Now you have your OTU table and it's time to analyze the results. Mothur offers some options to explore these data,  which we will use as a first exploration. Several packages in R are very flexible and offer great visualization and statistical methods (e.g. metagenomeSeq or phyloseq). If you have time at the end, look up the R packages to see how great their plots look and how varied their statistical approaches are.
+
+Also, in this exercise we won't look into the phylogenetic relationships within the data, but mothur also has many approaches to create phylogenetic trees from the sequence output, and both mothur and R have good options to plot and visualize those trees.
+
+
+### 7. Assess sequencing depth.
+Now that we have OTUs, we are ready to examine their abundances -- but have we sequenced enough to be confident in our abundances? More sequencing will always find more rare taxa, but we'd like to see how close samples are to saturation by rarefaction to guide quantitative comparisons.
+
+First, the file names are a mess, so we'll simplify them a bit, then we'll look at the total number of reads from each sample after filtering using count.groups.
+
+```{bash, eval=FALSE}
+rename.file(taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.0.03.cons.taxonomy, shared=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+count.groups(shared=stability.opti_mcc.shared)
+```
+
+In this case, we started with a partial dataset with only 5000 reads per sample, and then we filtered reads above. In your own dataset, you might have very different numbers of reads per sample. As you can imagine, samples with 5x fewer reads than average likely will have fewer OTUs present just because of sampling. How you deal with library size differences is a matter of debate -- here, we'll get an equivalent number of reads in all our samples. So check the output of the command above -- does the lowest count sample say 3387? If not, you'll need to change the number in the commands below.
+
+```{bash, eval=FALSE}
+sub.sample(shared=stability.opti_mcc.shared, size=3387)
+rarefaction.single(shared=stability.opti_mcc.shared, calc=sobs, freq=100)
+```
+
+To view this rarefaction curve, we need to download our data and make a graph. I'll show you a plot of these results later.
+
+### 8. Compare microbial communities in samples.
+We now would like to see whether the samples from the same treatment group have similar microbial composition. One approach to do this is to just examine the presence or absence of the most abundant OTUs (here 50). We can make a simple heatmap to visualize this.
+
+```{bash, eval=FALSE}
+summary.single(shared=stability.opti_mcc.shared, calc=nseqs-coverage-sobs-invsimpson, subsample=3387)
+heatmap.bin(shared=stability.opti_mcc.0.03.subsample.shared, scale=log2, numotu=50) 
+```
+
+We can also make a Venn diagram of which sequences are in common or unique in different sets of taxa:
+
+```{bash, eval=FALSE}
+venn(shared=stability.opti_mcc.0.03.subsample.shared, groups=Soil1-Soil2-Soil3-Soil4)
+venn(shared=stability.opti_mcc.0.03.subsample.shared, groups=Soil1-Soil1repeat)
+```
+
+We'll look at these graphs in a moment, but first start the next command, as it takes a while (changing the subsample number if relevant):
+
+```{bash, eval=FALSE}
+dist.shared(shared=stability.opti_mcc.shared, calc=thetayc-jclass, subsample=3387)
+```
+
+While this is running, use cyberduck to download the output of the heatmap file and the two Venn diagrams (all three have are .svg files). Open them. Which samples look the most similar? Which look the most different? How similar are the two replicate samples? Is that what you expect?
+
+When the above command is complete, we can move on to more subtle analyses that take into account not just presence/absence of OTUs but distributions. The above command estimated distance matrices between samples using two methods, Jaccard and Yue & Clayton theta. Look at one or more resulting matrices.
+
+```{bash, eval=FALSE}
+system(head 16Sdata/stability.opti_mcc.thetayc.0.03.lt.dist)
+```
+
+We now would like to visualize whether the samples from the same treatment group have similar microbial composition. Heatmaps are one way to look for similarity in OTUs abundances across samples.
+
+```{bash, eval=FALSE}
+heatmap.sim(phylip=stability.opti_mcc.thetayc.0.03.lt.ave.dist)
+heatmap.sim(phylip=stability.opti_mcc.jclass.0.03.lt.ave.dist)
+```
+
+Download these files to your laptop and look at the heat maps. Which samples are most similar when you take into account abundance, not just presence/absence of taxa? Compare the interpretation of these to the heatmap.bin output. 
+
+Another approach is to run ordination methods such as multidimensional scaling and look for clustering by treatment. You need to choose how many dimensions, so we've run lines with both two and three dimensions for comparison.
+
+```{bash, eval=FALSE}
+nmds(phylip=stability.opti_mcc.thetayc.0.03.lt.ave.dist)
+nmds(phylip=stability.opti_mcc.thetayc.0.03.lt.ave.dist, mindim=3, maxdim=3)
+```
+
+The output shows some goodness of fit measures. Stress below 0.1 is very good, but either of these dimensions are worth exploring. To plot these as a typical NMDS plot, download or copy the output dimensions and plot as a scatterplot in any graphing program. Do the samples cluster by treatment?
+
+
+### 9. Other analysis options for statistical comparisons, visualization, and interpretation
+Statistical analyses of 16S data are possible, but authors disagree as to the best analysis method. One fundamental problem is that your samples have different numbers of reads, yet normalization can cause many problems. The R package phyloseq suggests not normalizing and using DESeq2 for analysis. This is relatively easy to run, as phyloseq has a function that exports to DESeq2. The package metagenomeSeq uses an alternative approach. They offer a pretty popular normalization method followed by many good statistical models to choose from. If you have extra time, read up on these R packages. Keep in mind that when working with multiple programs, data formatting tends to be hard. How do you output data from mothur so it's compatible with phyloseq or metagenomeSeq?
+
+Another alternative to explore if you have time is the program MEGAN (http://ab.inf.uni-tuebingen.de/software/megan5/) -- this program offers you more annotation of your results by visualizing the taxonomic groups in your data using BLAST and visualizing functional data such as KEGG pathways. MEGAN's visualization methods also work for other datasets, for example you'd easily see the split between virus and snake DNA in yesterday's exercise.
+
+
+**All the commands! :) **
+```
+make.file(inputdir=16Sdata, type=fastq, prefix=stability)
+make.contigs(file=stability.files, processors=8)
+summary.seqs(fasta=stability.trim.contigs.fasta)
+screen.seqs(fasta=stability.trim.contigs.fasta, group=stability.contigs.groups, summary=stability.trim.contigs.summary, maxambig=0, maxlength=275)
+unique.seqs(fasta=stability.trim.contigs.good.fasta)
+count.seqs(name=stability.trim.contigs.good.names, group=stability.contigs.good.groups)
+summary.seqs(count=stability.trim.contigs.good.count_table)
+align.seqs(fasta=stability.trim.contigs.good.unique.fasta, reference=silva.bacteria.fasta)
+summary.seqs(fasta=stability.trim.contigs.good.unique.align, count=stability.trim.contigs.good.count_table)
+screen.seqs(fasta=stability.trim.contigs.good.unique.align, count=stability.trim.contigs.good.count_table, summary=stability.trim.contigs.good.unique.summary, start=13870, end=23444, maxhomop=8)
+summary.seqs(fasta=current, count=current)
+filter.seqs(fasta=stability.trim.contigs.good.unique.good.align, vertical=T, trump=.)
+unique.seqs(fasta=stability.trim.contigs.good.unique.good.filter.fasta, count=stability.trim.contigs.good.good.count_table)
+pre.cluster(fasta=stability.trim.contigs.good.unique.good.filter.unique.fasta, count=stability.trim.contigs.good.unique.good.filter.count_table, diffs=2)
+chimera.vsearch(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.count_table, dereplicate=t)
+remove.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.fasta, accnos=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.accnos)
+summary.seqs(fasta=current, count=current)
+classify.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.count_table, reference=trainset9_032012.pds.fasta, taxonomy=trainset9_032012.pds.tax, cutoff=80)
+remove.lineage(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.count_table, taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.taxonomy, taxon=Chloroplast-Mitochondria-unknown-Archaea-Eukaryota)
+summary.seqs(fasta=current, count=current)
+summary.tax(taxonomy=current, count=current)
+get.groups(count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.count_table, fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.fasta, groups=Mock)
+seq.error(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, reference=Mock.fasta, aligned=F)
+get.groups(count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.count_table, fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.fasta, groups=Mock)
+seq.error(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, reference=Mock.fasta, aligned=F)
+dist.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, cutoff=0.03)
+cluster(column=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.dist, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table)
+make.shared(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, label=0.03)
+system(more 16Sdata/stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+rarefaction.single(shared=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+remove.groups(count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.count_table, fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.fasta, taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.pick.taxonomy, groups=Mock-water-isolate1-isolate2-isolate3-isolate4-isolate5)
+dist.seqs(fasta=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.fasta, cutoff=0.03)
+cluster(column=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.dist, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table)
+make.shared(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, label=0.03)
+classify.otu(list=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.list, count=stability.trim.contigs.good.unique.good.filter.unique.precluster.denovo.vsearch.pick.pick.pick.count_table, taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pds.wang.pick.pick.taxonomy, label=0.03)
+rename.file(taxonomy=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.0.03.cons.taxonomy, shared=stability.trim.contigs.good.unique.good.filter.unique.precluster.pick.pick.pick.opti_mcc.shared)
+count.groups(shared=stability.opti_mcc.shared)
+sub.sample(shared=stability.opti_mcc.shared, size=3387)
+rarefaction.single(shared=stability.opti_mcc.shared, calc=sobs, freq=100)
+summary.single(shared=stability.opti_mcc.shared, calc=nseqs-coverage-sobs-invsimpson, subsample=3387)
+heatmap.bin(shared=stability.opti_mcc.0.03.subsample.shared, scale=log2, numotu=50) 
+dist.shared(shared=stability.opti_mcc.shared, calc=thetayc-jclass, subsample=3387)
+heatmap.sim(phylip=stability.opti_mcc.thetayc.0.03.lt.ave.dist)
+heatmap.sim(phylip=stability.opti_mcc.jclass.0.03.lt.ave.dist)
+venn(shared=stability.opti_mcc.0.03.subsample.shared, groups=Soil1-Soil2-Soil3-Soil4)
+venn(shared=stability.opti_mcc.0.03.subsample.shared, groups=Soil1-Soil1repeat)
+nmds(phylip=stability.opti_mcc.thetayc.0.03.lt.ave.dist)
+nmds(phylip=stability.opti_mcc.thetayc.0.03.lt.ave.dist, mindim=3, maxdim=3)
+```

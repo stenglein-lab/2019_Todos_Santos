@@ -1,0 +1,13 @@
+16S_Soil1
+16S_Soil2
+16S_Soil3
+16S_Soil4
+16S_Soil5
+16S_isolate1
+16S_isolate2
+16S_isolate3
+16S_isolate4
+16S_isolate5
+16S_soil1_repeat
+16S_water
+16S_zymo

@@ -4,4 +4,4 @@ Exercises created by Mark Stenglein for the Genomics and Bioinformatics workshop
 - [Variant calling exercise](./variant_exercise.md)
 
 
-![TS 2019](./TS_WorkshopLogo.png)
+![TS 2019](../lectures/TS_WorkshopLogo.png)

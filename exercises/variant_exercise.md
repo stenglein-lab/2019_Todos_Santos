@@ -1,5 +1,4 @@
 ## Intrahost variation exercise
----
 
 ## In this exercise, we will go through a variant calling pipeline. 
 

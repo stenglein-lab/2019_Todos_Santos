@@ -351,7 +351,7 @@ Open tablet:
   - For the Primary assembly file, use the .sam file you just downloaded.   
   - For the Reference/consensus file, use the fasta formatted file for NC_007398 that you downloaded from Genbank.  (Also here: [NC_007398.fasta](https://raw.githubusercontent.com/stenglein-lab/2018_Todos_Santos/master/exercises/NC_007398.fasta) )
 
-- Click 'Open Features'.  Open the .gff3 file you downloaded from Genbank earlier.  (Also here: [NC_007398.gff3](https://raw.githubusercontent.com/stenglein-lab/2018_Todos_Santos/master/exercises/NC_007398.gff3) )
+- Click 'Import Features'.  Open the .gff3 file you downloaded from Genbank earlier.  (Also here: [NC_007398.gff3](https://raw.githubusercontent.com/stenglein-lab/2018_Todos_Santos/master/exercises/NC_007398.gff3) )
 
 Some questions to consider when viewing the alignment:
  - Is the coverage even across the mitochondrial genome?  What is the average coverage?  
@@ -380,7 +380,8 @@ The instructors have already downloaded an assembly of the boa constrictor genom
 First, let's move the bowtie index to your working folder:
 ```
 cd ~/ts_working    # in case not in the right directory
-mv ../TodosSantos/boa_constrictor_bt_index* .
+# copy the boa constrictor bowtie index to the current directory
+cp ../TodosSantos/boa_constrictor_bt_index* .
 ```
 
 Now, we'll run bowtie2 to map reads to the entire boa genome.  This time we'll run bowtie2 a little differently:

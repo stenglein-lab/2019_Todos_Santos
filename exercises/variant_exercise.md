@@ -1,7 +1,5 @@
 ## Intrahost variation exercise
 ---
-![TS 2018](./TS_WorkshopLogo.png)
----
 
 ## In this exercise, we will go through a variant calling pipeline. 
 
